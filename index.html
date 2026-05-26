@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة تحدي الحواس والسرعة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #4c1d95 100%);
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1rem;
+        }
+        .btn {
+            transition: all 0.2s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .image-blur-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            height: 400px;
+            margin: 0 auto;
+            border-radius: 1rem;
+            overflow: hidden;
+            background-color: #000;
+        }
+        #game-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: blur(40px);
+            transition: filter 1s linear;
+        }
+        .hidden-answer {
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.5s ease;
+        }
+        .show-answer {
+            opacity: 1;
+            transform: scale(1);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <!-- Header / Scoreboard -->
+    <header class="glass-panel m-4 p-4 flex justify-between items-center shadow-lg">
+        <div class="text-center">
+            <h2 class="text-xl font-bold text-blue-300">الفريق الأول</h2>
+            <div class="text-4xl font-black mt-1" id="score1">0</div>
+        </div>
+        <div class="text-center">
+            <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">تحدي الحواس والسرعة</h1>
+            <p class="text-sm text-gray-300 mt-1" id="round-title">الشاشة الرئيسية</p>
+        </div>
+        <div class="text-center">
+            <h2 class="text-xl font-bold text-red-300">الفريق الثاني</h2>
+            <div class="text-4xl font-black mt-1" id="score2">0</div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow flex items-center justify-center p-4" id="main-content">
+        <!-- Content will be injected here by JS -->
+    </main>
+
+    <!-- Controls Footer -->
+    <footer class="glass-panel m-4 p-4 flex justify-between items-center hidden" id="controls-footer">
+        <button onclick="prevQuestion()" class="btn px-6 py-2 bg-gray-600 text-white rounded-lg font-bold"><i class="fas fa-arrow-right ml-2"></i>السابق</button>
+        
+        <div class="flex gap-2" id="score-buttons" style="display: none;">
+            <button onclick="addScore(1)" class="btn px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold">+ نقطة للفريق الأول</button>
+            <button onclick="addScore(2)" class="btn px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold">+ نقطة للفريق الثاني</button>
+        </div>
+
+        <button onclick="nextQuestion()" class="btn px-6 py-2 bg-green-500 hover:bg-green-400 text-white rounded-lg font-bold">التالي <i class="fas fa-arrow-left mr-2"></i></button>
+    </footer>
+
+    <!-- Audio Element -->
+    <audio id="game-audio"></audio>
+
+    <script>
+        // --- Game Data ---
+        const gameData = [
+            {
+                id: 'home',
+                title: 'مرحباً بكم في لعبة تحدي الحواس والسرعة',
+                type: 'cover'
+            },
+            // Round 1
+            { id: 'r1_intro', title: 'الجولة الأولى: إلحق الصورة', type: 'intro', desc: 'ستظهر صورة مشوشة جداً وتتضح تدريجياً. الأسرع في ضغط الجرس ومعرفة الصورة يكسب النقاط!' },
+            { id: 'r1_q1', title: 'الجولة الأولى: إلحق الصورة (1)', type: 'image', img: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?q=80&w=800&auto=format&fit=crop', answer: 'صحن كبسة / أرز ولحم' },
+            { id: 'r1_q2', title: 'الجولة الأولى: إلحق الصورة (2)', type: 'image', img: 'https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?q=80&w=800&auto=format&fit=crop', answer: 'ساعة مكة المكرمة' },
+            { id: 'r1_q3', title: 'الجولة الأولى: إلحق الصورة (3)', type: 'image', img: 'https://upload.wikimedia.org/wikipedia/ar/5/52/Bumpety_Boo.jpg', answer: 'بومبو (السيارة الصفراء)' }, // Placeholder for cartoon
+            
+            // Round 2
+            { id: 'r2_intro', title: 'الجولة الثانية: بدون كلام... بس بالصوت', type: 'intro', desc: 'سيتم تشغيل مقطع صوتي لمدة 5 ثوانٍ فقط! ركز جيداً لمعرفة مصدر الصوت.' },
+            { id: 'r2_q1', title: 'الجولة الثانية: صوتيات (1)', type: 'audio', src: 'https://actions.google.com/sounds/v1/water/waves_crashing_on_rock_beach.ogg', answer: 'أمواج البحر' },
+            { id: 'r2_q2', title: 'الجولة الثانية: صوتيات (2)', type: 'audio', src: 'https://actions.google.com/sounds/v1/transportation/train_pass_by.ogg', answer: 'قطار يمر' },
+            { id: 'r2_q3', title: 'الجولة الثانية: صوتيات (3)', type: 'audio', src: 'https://actions.google.com/sounds/v1/tools/cutting_paper.ogg', answer: 'قص ورق' },
+
+            // Round 3
+            { id: 'r3_intro', title: 'الجولة الثالثة: أسئلة ثقافية منوعة', type: 'intro', desc: 'مواجهة مباشرة! يخرج ممثل من كل فريق وتطرح عليهما خيارات.' },
+            { id: 'r3_q1', title: 'الجولة الثالثة: سؤال (1)', type: 'trivia', q: 'ما هو الغاز الذي يعتمد عليه النبات في البناء الضوئي؟', options: ['الأكسجين', 'النيتروجين', 'ثاني أكسيد الكربون', 'الهيدروجين'], answer: 'ثاني أكسيد الكربون' },
+            { id: 'r3_q2', title: 'الجولة الثالثة: سؤال (2)', type: 'trivia', q: 'من هو الخليفة الأموي الذي أسس نظام البريد في الإسلام؟', options: ['عمر بن عبد العزيز', 'معاوية بن أبي سفيان', 'عبد الملك بن مروان', 'الوليد بن عبد الملك'], answer: 'معاوية بن أبي سفيان' },
+            { id: 'r3_q3', title: 'الجولة الثالثة: سؤال (3)', type: 'trivia', q: 'أين يقع أطول نهر في العالم (نهر النيل)؟', options: ['قارة آسيا', 'قارة أفريقيا', 'قارة أوروبا', 'أمريكا الجنوبية'], answer: 'قارة أفريقيا' },
+
+            // Round 4
+            { id: 'r4_intro', title: 'الجولة الرابعة: السرعة الرقمية', type: 'intro', desc: 'أسئلة إجابتها أرقام فقط. اكتب رقمك باللوحة. الفريق الأقرب للإجابة (بدون أن يتعداها) هو الفائز!' },
+            { id: 'r4_q1', title: 'الجولة الرابعة: أرقام (1)', type: 'number', q: 'كم عدد سور القرآن الكريم؟', answer: 114 },
+            { id: 'r4_q2', title: 'الجولة الرابعة: أرقام (2)', type: 'number', q: 'كم دقيقة تستغرق الرحلة بالطائرة من الرياض إلى جدة تقريباً؟', answer: 95 },
+            { id: 'r4_q3', title: 'الجولة الرابعة: أرقام (3)', type: 'number', q: 'كم عدد العظام في جسم الإنسان البالغ؟', answer: 206 },
+            { id: 'r4_q4', title: 'الجولة الرابعة: أرقام (4)', type: 'number', q: 'في أي عام ميلادي تم إعلان توحيد المملكة العربية السعودية؟', answer: 1932 },
+
+            { id: 'end', title: 'نهاية اللعبة', type: 'end' }
+        ];
+
+        // --- State ---
+        let currentIndex = 0;
+        let score1 = 0;
+        let score2 = 0;
+        let blurInterval = null;
+        let currentBlur = 40;
+
+        // --- DOM Elements ---
+        const mainContent = document.getElementById('main-content');
+        const score1El = document.getElementById('score1');
+        const score2El = document.getElementById('score2');
+        const roundTitleEl = document.getElementById('round-title');
+        const footerControls = document.getElementById('controls-footer');
+        const scoreButtons = document.getElementById('score-buttons');
+        const audioElement = document.getElementById('game-audio');
+
+        // --- Logic ---
+        function updateScoreboard() {
+            score1El.innerText = score1;
+            score2El.innerText = score2;
+            roundTitleEl.innerText = gameData[currentIndex].title;
+        }
+
+        function addScore(team) {
+            if (team === 1) score1 += 10;
+            if (team === 2) score2 += 10;
+            updateScoreboard();
+        }
+
+        function nextQuestion() {
+            if (currentIndex < gameData.length - 1) {
+                currentIndex++;
+                renderCurrentSlide();
+            }
+        }
+
+        function prevQuestion() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                renderCurrentSlide();
+            }
+        }
+
+        function startGame() {
+            currentIndex = 1;
+            footerControls.classList.remove('hidden');
+            renderCurrentSlide();
+        }
+
+        // --- Slide Renderers ---
+        function renderCurrentSlide() {
+            clearInterval(blurInterval); // Clear any running image timers
+            audioElement.pause(); // Stop any audio
+            updateScoreboard();
+            const slide = gameData[currentIndex];
+            scoreButtons.style.display = (slide.type === 'intro' || slide.type === 'cover' || slide.type === 'end') ? 'none' : 'flex';
+
+            switch (slide.type) {
+                case 'cover': renderCover(slide); break;
+                case 'intro': renderIntro(slide); break;
+                case 'image': renderImage(slide); break;
+                case 'audio': renderAudio(slide); break;
+                case 'trivia': renderTrivia(slide); break;
+                case 'number': renderNumber(slide); break;
+                case 'end': renderEnd(slide); break;
+            }
+        }
+
+        function renderCover(slide) {
+            footerControls.classList.add('hidden');
+            mainContent.innerHTML = `
+                <div class="text-center glass-panel p-12 max-w-2xl w-full">
+                    <i class="fas fa-gamepad text-6xl text-yellow-400 mb-6"></i>
+                    <h1 class="text-5xl font-black mb-4">تحدي الحواس والسرعة</h1>
+                    <p class="text-xl mb-8 text-gray-200">لعبة تفاعلية ممتعة تجمع بين التركيز البصري، السمعي، الثقافة، وسرعة البديهة!</p>
+                    <button onclick="startGame()" class="btn px-8 py-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-black rounded-full font-black text-2xl shadow-xl hover:scale-105">
+                        ابدأ اللعب الآن <i class="fas fa-play ml-2"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderIntro(slide) {
+            mainContent.innerHTML = `
+                <div class="text-center glass-panel p-12 max-w-2xl w-full">
+                    <h2 class="text-4xl font-black mb-6 text-yellow-400">${slide.title}</h2>
+                    <p class="text-2xl leading-relaxed">${slide.desc}</p>
+                </div>
+            `;
+        }
+
+        function renderImage(slide) {
+            currentBlur = 40;
+            mainContent.innerHTML = `
+                <div class="w-full max-w-3xl glass-panel p-6 flex flex-col items-center">
+                    <div class="image-blur-container mb-6 shadow-2xl">
+                        <img id="game-image" src="${slide.img}" style="filter: blur(40px);">
+                    </div>
+                    <div class="flex gap-4 mb-6">
+                        <button onclick="startBlurTimer()" class="btn px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg font-bold text-lg"><i class="fas fa-play mr-2"></i> ابدأ التصفية</button>
+                        <button onclick="revealAnswer()" class="btn px-6 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold text-lg"><i class="fas fa-eye mr-2"></i> إظهار الإجابة</button>
+                    </div>
+                    <div id="answer-box" class="hidden-answer bg-white text-black text-3xl font-black py-4 px-8 rounded-xl shadow-lg border-4 border-yellow-400">
+                        ${slide.answer}
+                    </div>
+                </div>
+            `;
+        }
+
+        window.startBlurTimer = function() {
+            const img = document.getElementById('game-image');
+            clearInterval(blurInterval);
+            blurInterval = setInterval(() => {
+                if (currentBlur > 0) {
+                    currentBlur -= 2;
+                    img.style.filter = \`blur(\${currentBlur}px)\`;
+                } else {
+                    clearInterval(blurInterval);
+                }
+            }, 500); // Decreases blur every 0.5s
+        };
+
+        function renderAudio(slide) {
+            audioElement.src = slide.src;
+            mainContent.innerHTML = `
+                <div class="w-full max-w-2xl glass-panel p-12 flex flex-col items-center text-center">
+                    <i class="fas fa-headphones-alt text-8xl text-yellow-400 mb-8 drop-shadow-lg"></i>
+                    <p class="text-xl mb-8">استعد لضغط الزر للتشغيل.. الصوت سيعمل لمدة 5 ثوانٍ فقط!</p>
+                    <div class="flex gap-4 mb-8">
+                        <button onclick="playFiveSeconds()" class="btn px-8 py-4 bg-purple-600 hover:bg-purple-500 rounded-full font-black text-2xl shadow-lg">
+                            <i class="fas fa-play mr-2"></i> تشغيل الصوت
+                        </button>
+                        <button onclick="revealAnswer()" class="btn px-8 py-4 bg-green-600 hover:bg-green-500 rounded-full font-black text-2xl shadow-lg">
+                            <i class="fas fa-eye mr-2"></i> إظهار الإجابة
+                        </button>
+                    </div>
+                    <div id="answer-box" class="hidden-answer bg-white text-black text-3xl font-black py-4 px-8 rounded-xl shadow-lg border-4 border-yellow-400 w-full">
+                        ${slide.answer}
+                    </div>
+                </div>
+            `;
+        }
+
+        window.playFiveSeconds = function() {
+            audioElement.currentTime = 0;
+            audioElement.play();
+            setTimeout(() => {
+                audioElement.pause();
+            }, 5000);
+        };
+
+        function renderTrivia(slide) {
+            let optionsHtml = slide.options.map(opt => 
+                `<div class="bg-indigo-900 bg-opacity-50 p-4 border border-indigo-400 rounded-xl text-2xl text-center font-bold">${opt}</div>`
+            ).join('');
+
+            mainContent.innerHTML = `
+                <div class="w-full max-w-4xl glass-panel p-8">
+                    <h3 class="text-4xl font-black mb-10 text-center leading-tight bg-black bg-opacity-30 p-6 rounded-xl border border-white border-opacity-20">${slide.q}</h3>
+                    <div class="grid grid-cols-2 gap-6 mb-10">
+                        ${optionsHtml}
+                    </div>
+                    <div class="flex justify-center mb-6">
+                         <button onclick="revealAnswer()" class="btn px-8 py-4 bg-green-600 hover:bg-green-500 rounded-full font-black text-xl shadow-lg"><i class="fas fa-eye mr-2"></i> الإجابة الصحيحة</button>
+                    </div>
+                    <div id="answer-box" class="hidden-answer text-center bg-white text-black text-4xl font-black py-6 px-8 rounded-xl shadow-lg border-4 border-yellow-400">
+                        ${slide.answer}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderNumber(slide) {
+            mainContent.innerHTML = `
+                <div class="w-full max-w-4xl glass-panel p-8">
+                    <h3 class="text-4xl font-black mb-8 text-center bg-black bg-opacity-30 p-6 rounded-xl">${slide.q}</h3>
+                    
+                    <div class="grid grid-cols-2 gap-8 mb-8">
+                        <div class="bg-blue-900 bg-opacity-60 p-6 rounded-xl text-center border-2 border-blue-400">
+                            <h4 class="text-2xl font-bold mb-4 text-blue-200">إجابة الفريق الأول</h4>
+                            <input type="number" id="guess-team1" class="w-full text-center text-4xl font-black p-4 rounded-lg text-black focus:outline-none" placeholder="0">
+                        </div>
+                        <div class="bg-red-900 bg-opacity-60 p-6 rounded-xl text-center border-2 border-red-400">
+                            <h4 class="text-2xl font-bold mb-4 text-red-200">إجابة الفريق الثاني</h4>
+                            <input type="number" id="guess-team2" class="w-full text-center text-4xl font-black p-4 rounded-lg text-black focus:outline-none" placeholder="0">
+                        </div>
+                    </div>
+
+                    <div class="flex justify-center gap-4 mb-6">
+                        <button onclick="calculateWinner(${slide.answer})" class="btn px-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg font-bold text-xl"><i class="fas fa-calculator mr-2"></i> احسب الفائز</button>
+                        <button onclick="revealAnswer()" class="btn px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-xl"><i class="fas fa-eye mr-2"></i> الإجابة الصحيحة</button>
+                    </div>
+                    
+                    <div id="calc-result" class="text-center text-2xl font-bold text-yellow-300 mb-4 h-8"></div>
+
+                    <div id="answer-box" class="hidden-answer text-center bg-white text-black text-5xl font-black py-6 px-8 rounded-xl shadow-lg border-4 border-yellow-400">
+                        ${slide.answer}
+                    </div>
+                </div>
+            `;
+        }
+
+        window.calculateWinner = function(correctAnswer) {
+            const g1 = parseInt(document.getElementById('guess-team1').value) || 0;
+            const g2 = parseInt(document.getElementById('guess-team2').value) || 0;
+            const resEl = document.getElementById('calc-result');
+
+            // Logic: closest without going over
+            let diff1 = correctAnswer - g1;
+            let diff2 = correctAnswer - g2;
+
+            let winnerMsg = "";
+
+            if (diff1 >= 0 && diff2 >= 0) {
+                if (diff1 < diff2) winnerMsg = "🏆 الفريق الأول هو الأقرب! أعطه النقطة";
+                else if (diff2 < diff1) winnerMsg = "🏆 الفريق الثاني هو الأقرب! أعطه النقطة";
+                else winnerMsg = "🤝 تعادل! كلاهما كتب نفس الرقم";
+            } else if (diff1 >= 0) {
+                winnerMsg = "🏆 الفريق الأول هو الفائز (الفريق الثاني تجاوز الرقم)";
+            } else if (diff2 >= 0) {
+                winnerMsg = "🏆 الفريق الثاني هو الفائز (الفريق الأول تجاوز الرقم)";
+            } else {
+                winnerMsg = "❌ كلا الفريقين تجاوزا الإجابة الصحيحة!";
+            }
+
+            resEl.innerText = winnerMsg;
+        };
+
+        function renderEnd(slide) {
+            let winner = "";
+            let color = "";
+            if(score1 > score2) { winner = "الفريق الأول"; color="text-blue-400"; }
+            else if(score2 > score1) { winner = "الفريق الثاني"; color="text-red-400"; }
+            else { winner = "تعادل!"; color="text-yellow-400"; }
+
+            mainContent.innerHTML = `
+                <div class="text-center glass-panel p-16 max-w-3xl w-full">
+                    <i class="fas fa-trophy text-8xl text-yellow-400 mb-8 drop-shadow-2xl"></i>
+                    <h1 class="text-6xl font-black mb-6">انتهت اللعبة!</h1>
+                    <h2 class="text-4xl font-bold mb-8">الفائز هو: <span class="${color} text-5xl">${winner}</span></h2>
+                    
+                    <div class="flex justify-center gap-12 text-3xl font-black mb-12 border-t border-white border-opacity-20 pt-8">
+                        <div>الفريق الأول: <span class="text-blue-300">${score1}</span></div>
+                        <div>الفريق الثاني: <span class="text-red-300">${score2}</span></div>
+                    </div>
+
+                    <button onclick="location.reload()" class="btn px-8 py-4 bg-gray-700 hover:bg-gray-600 rounded-full font-bold text-xl"><i class="fas fa-redo ml-2"></i> العودة للرئيسية وإعادة اللعب</button>
+                </div>
+            `;
+            footerControls.classList.add('hidden');
+        }
+
+        window.revealAnswer = function() {
+            const answerBox = document.getElementById('answer-box');
+            if(answerBox) {
+                answerBox.classList.remove('hidden-answer');
+                answerBox.classList.add('show-answer');
+                
+                // If it's an image, instantly remove blur
+                const img = document.getElementById('game-image');
+                if(img) {
+                    clearInterval(blurInterval);
+                    img.style.filter = 'blur(0px)';
+                }
+            }
+        };
+
+        // Initialize Home
+        renderCurrentSlide();
+    </script>
+</body>
+</html>
